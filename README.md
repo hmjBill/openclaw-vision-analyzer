@@ -1,0 +1,43 @@
+# openclaw-vision-analyzer
+
+`openclaw-vision-analyzer` 是一个为 Openclaw 提供图片与视频识别处理流程的 skill 项目。仓库包含技能说明、媒体预处理脚本和约束参考文档。
+
+## 项目范围
+
+- 识别图片与视频相关请求。
+- 在当前模型不支持视觉输入时，切换到视觉模型执行识别。
+- 按输入大小、分辨率和格式规则选择处理路径。
+- 返回结构化处理结果与限制命中信息。
+
+## 处理路径
+
+- 图片输入：
+  - 来源支持本地路径或公网 URL。
+  - 默认本地限制：文件大小 `<= 7MB`，最大边 `<= 4096`。
+  - 默认策略：符合限制走 `direct_base64`，超限走 `reject`。
+- 视频输入：
+  - 来源支持本地路径或公网 URL。
+  - 默认本地阈值：`<= 7MB` 走 `direct_base64`。
+  - `> 7MB` 走 `frame_extraction`，并按上限截断帧数（默认 `<= 8000`）。
+
+## 仓库结构
+
+- `openclaw-vision-analyzer/SKILL.md`：技能触发、约束、消息构造与返回行为说明。
+- `openclaw-vision-analyzer/agents/openai.yaml`：技能展示信息与默认提示词。
+- `openclaw-vision-analyzer/scripts/prepare_media.py`：本地媒体校验、转 Data URL、视频抽帧脚本。
+- `openclaw-vision-analyzer/references/constraints-and-examples.md`：约束与示例参考。
+- `openclaw-vision-analyzer/references/doc-final-summary.md`：实现文档收束归纳。
+
+## 运行脚本
+
+```bash
+python openclaw-vision-analyzer/scripts/prepare_media.py --help
+python openclaw-vision-analyzer/scripts/prepare_media.py image --path /abs/path/image.png
+python openclaw-vision-analyzer/scripts/prepare_media.py video --path /abs/path/video.mp4 --frames-dir ./tmp_frames
+```
+
+## 依赖
+
+- Python 3
+- `Pillow`（图片分辨率与格式读取）
+- `ffmpeg`（超限视频抽帧）
