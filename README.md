@@ -14,11 +14,13 @@
 - 图片输入：
   - 来源支持本地路径或公网 URL。
   - 默认本地限制：文件大小 `<= 7MB`，最大边 `<= 4096`。
-  - 默认策略：符合限制走 `direct_base64`，超限走 `reject`。
+  - 分辨率格式规则：4K 以下支持 `BMP/JPEG/PNG/TIFF/WEBP/HEIC`，4K-8K 仅 `JPEG/PNG`（显式放宽时）。
+  - 默认策略：符合限制且 Base64 请求体估算 `<= 10MB` 走 `direct_base64`，否则 `reject`。
 - 视频输入：
   - 来源支持本地路径或公网 URL。
-  - 默认本地阈值：`<= 7MB` 走 `direct_base64`。
-  - `> 7MB` 走 `frame_extraction`，并按上限截断帧数（默认 `<= 8000`）。
+  - 支持格式：`MP4/AVI/MKV/MOV/FLV/WMV`。
+  - 默认本地阈值：`<= 7MB` 且 Base64 请求体估算 `<= 10MB` 走 `direct_base64`。
+  - 其他情况走 `frame_extraction`，帧数范围默认 `4~8000`。
 
 ## 仓库结构
 
@@ -33,7 +35,7 @@
 ```bash
 python openclaw-vision-analyzer/scripts/prepare_media.py --help
 python openclaw-vision-analyzer/scripts/prepare_media.py image --path /abs/path/image.png
-python openclaw-vision-analyzer/scripts/prepare_media.py video --path /abs/path/video.mp4 --frames-dir ./tmp_frames
+python openclaw-vision-analyzer/scripts/prepare_media.py video --path /abs/path/video.mp4 --frames-dir ./tmp_frames --fps 2 --min-frames 4 --max-frames 8000
 ```
 
 ## 依赖

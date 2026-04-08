@@ -7,47 +7,44 @@ description: 为 Openclaw 提供图片与视频识别能力。用于分析图片
 
 ## 执行流程
 
-1. 判断请求是否涉及视觉输入。
-- 识别图片、截图、图表、架构图、视频分析等请求。
+1. 视觉请求识别。
+- 当输入包含图片、截图、图表、架构图、视频文件、视频 URL 或要求识别视觉内容时触发。
 
-2. 选择视觉模型。
-- 若当前模型不支持视觉输入，切换到 `qwen3.5-plus` 或 `kimi-k2.5` 执行视觉理解。
-- 视觉结果返回后，再继续当前对话流程。
+2. 模型路由。
+- 当前模型支持视觉时，直接执行。
+- 当前模型不支持视觉时，路由到 `qwen3.5-plus` 或 `kimi-k2.5` 执行视觉理解，再返回结果。
 
-3. 处理图片输入。
-- 支持来源：本地文件路径或公网 URL。
-- 本地图片默认限制：文件大小 `<= 7MB`，分辨率 `<= 4096`（4K）。
-- 本地图片超限时，终止调用并返回限制说明。
+3. 媒体输入分流。
+- 支持本地路径与公网 URL。
+- 本地输入按文件大小、分辨率、格式、Base64 请求体估算进行分流。
+- 公网 URL 输入在调用前校验响应头约束。
 
-4. 处理视频输入。
-- 支持来源：本地文件路径或公网 URL。
-- 本地视频 `<= 7MB`：可直接转 Base64 进行请求。
-- 本地视频 `> 7MB`：先抽帧，再按多图片方式请求。
-- 抽帧上限：`<= 8000` 帧。
-
-5. 并发调用策略。
-- 批量图片对比或高并发问题，使用异步调用（`AsyncOpenAI`）处理多请求。
-
-6. 保持接口配置一致。
-- API Key 与 Base URL 保持 Openclaw 现有配置。
-- 不新增环境变量配置要求。
+4. 接口一致性。
+- API Key 与 Base URL 使用 Openclaw 现有配置。
+- 不新增环境变量要求。
 
 ## 输入与限制规则
 
-1. 图片限制。
-- 文件大小：`<= 7MB`。
-- 分辨率：默认 `<= 4K`。
-- 4K 以下支持格式：`BMP/JPEG/PNG/TIFF/WEBP/HEIC`。
-- 4K-8K 兼容格式：`JPEG/PNG`（仅在明确允许 8K 时使用）。
+1. 图片输入。
+- 本地文件大小：`<= 7MB`（按 Base64 请求体上限约束，默认总请求体 `<= 10MB`）。
+- 默认分辨率上限：`<= 4096`（4K）。
+- 4K 以下格式：`BMP/JPEG/PNG/TIFF/WEBP/HEIC`。
+- 4K-8K 兼容格式：`JPEG/PNG`（仅在显式放宽分辨率时启用）。
 
-2. 视频限制。
-- 公网 URL：`qwen3.5/Qwen3-VL` 最高 `2GB`（需远端返回 `Content-Length` 和 `Content-Type`）。
-- Base64：总请求体小于 `10MB`，本地文件按 `<= 7MB` 执行。
+2. 视频输入。
 - 支持格式：`MP4/AVI/MKV/MOV/FLV/WMV`。
+- 本地视频 `<= 7MB` 且 Base64 请求体估算 `<= 10MB`：`direct_base64`。
+- 本地视频超阈值：`frame_extraction`（按多图请求）。
+- 公网 `video_url`：远端响应需包含 `Content-Length` 与 `Content-Type`。
+- `qwen3.5/Qwen3-VL` 的公网 URL 模式可到 `2GB`（以服务端能力为准）。
 
-3. 帧数限制（视频抽帧模式）。
-- `qwen3.5` 系列：`4~8000` 帧。
-- 若超过上限，截断至上限后继续请求。
+3. 抽帧约束。
+- 默认抽帧速率：`2 fps`，可按任务密度调整。
+- `qwen3.5` 系列帧数范围：`4~8000`。
+- 超过上限时截断至上限；低于最小帧数时返回限制命中信息。
+
+4. Token 预算。
+- 视频抽帧模式需控制“全部帧 + 文本”总 Token 不超过模型上限。
 
 ## 消息构造规范
 
@@ -107,15 +104,15 @@ description: 为 Openclaw 提供图片与视频识别能力。用于分析图片
 ## 脚本资源
 
 1. 使用 `scripts/prepare_media.py` 预处理本地媒体文件。
-- 图片模式：检查大小、分辨率、格式，必要时输出 Data URL。
-- 视频模式：按大小决定直传或抽帧，并输出结构化结果。
+- 图片模式：检查大小、分辨率、分辨率对应格式、Base64 请求体估算，必要时输出 Data URL。
+- 视频模式：检查格式与大小，按规则执行直传或抽帧，并输出结构化结果。
 
 2. 常用命令。
 
 ```bash
 python scripts/prepare_media.py image --path /abs/path/image.png
 python scripts/prepare_media.py image --path /abs/path/image.png --emit-data-url
-python scripts/prepare_media.py video --path /abs/path/video.mp4 --frames-dir ./tmp_frames
+python scripts/prepare_media.py video --path /abs/path/video.mp4 --frames-dir ./tmp_frames --fps 2 --min-frames 4 --max-frames 8000
 python scripts/prepare_media.py video --path /abs/path/video.mp4 --emit-data-url
 ```
 
@@ -126,4 +123,5 @@ python scripts/prepare_media.py video --path /abs/path/video.mp4 --emit-data-url
 
 1. 返回模型原始分析结果。
 2. 返回输入处理路径（直传 URL、Base64、或抽帧）。
-3. 在命中限制时返回限制项与触发条件（大小/分辨率/格式/帧数）。
+3. 在命中限制时返回限制项与触发条件（大小/分辨率/格式/请求体/帧数/Token 预算）。
+4. 批量场景可使用异步调用（`AsyncOpenAI`）并返回逐任务结果。
