@@ -29,6 +29,7 @@
 - `openclaw-vision-analyzer/scripts/prepare_media.py`：本地媒体校验、转 Data URL、视频抽帧脚本。
 - `openclaw-vision-analyzer/references/constraints-and-examples.md`：约束与示例参考。
 - `openclaw-vision-analyzer/references/doc-final-summary.md`：实现文档收束归纳。
+- `openclaw-vision-analyzer/references/pdf-implementation-sync.md`：PDF 具体实现与仓库落地映射。
 
 ## 运行脚本
 
